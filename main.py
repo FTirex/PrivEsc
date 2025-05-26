@@ -21,7 +21,6 @@ def main():
 
     # Call the check functions from their respective modules
     check_sudo_misconfigurations()
-    check_suid_sgid_binaries()
     check_writable_critical_files()
     check_kernel_version()
     check_home_directory_permissions()
