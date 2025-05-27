@@ -2,11 +2,11 @@
 
 import os
 import subprocess
-from checks.sudo_checks import check_sudo_misconfigurations
+from checks.sudo_check import check_sudo_misconfigurations
 from checks.suid_sgid_checks import check_suid_sgid_binaries
-from checks.writable_files_checks import check_writable_critical_files
-from checks.kernel_version_check import check_kernel_version
-from checks.home_dir_permissions_check import check_home_directory_permissions
+from checks.writable_files import check_writable_critical_files
+from checks.kernel import check_kernel_version
+from checks.home_dir import check_home_directory_permissions
 from checks.advanced_checks import run_all_advanced_checks
 
 from utils.findings import findings_collector # Import the collector
