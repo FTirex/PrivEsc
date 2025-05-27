@@ -1,7 +1,8 @@
 # checks/sudo_checks.py
 
 import subprocess
-import os # We'll need os for DEVNULL
+import os
+from utils.findings import findings_collector, Severity
 
 def check_sudo_misconfigurations():
     """
@@ -10,52 +11,69 @@ def check_sudo_misconfigurations():
     """
     print("[*] Checking for SUDO misconfigurations...")
     try:
-        # Run 'sudo -l' to list allowed sudo commands for the current user.
-        # Fixed: Using stdout=subprocess.PIPE and stderr=subprocess.DEVNULL
-        # instead of capture_output=True to avoid ValueError.
         result = subprocess.run(
             ['sudo', '-l'],
-            stdout=subprocess.PIPE,  # Capture standard output
-            stderr=subprocess.DEVNULL, # Send standard error to nowhere (discard it)
-            text=True,               # Decode output as text
-            check=True               # Raise an exception for non-zero exit codes
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            check=True
         )
         output = result.stdout
 
         found_misconfigurations = False
         for line in output.splitlines():
-            # Look for lines indicating NOPASSWD or ALL commands for the current user
-            # This is a basic check; more advanced parsing might be needed for complex rules.
             if "NOPASSWD" in line and "ALL" in line and "ALL" in line.split(' (')[0]:
-                print(f"  [+] Possible SUDO NOPASSWD misconfiguration found:")
-                print(f"      {line.strip()}")
-                print("      Consider investigating if you can run privileged commands without a password.")
+                findings_collector.add_finding(
+                    check_type="SUDO Misconfiguration",
+                    severity=Severity.HIGH,
+                    title="SUDO NOPASSWD Entry Found",
+                    description="The current user can run certain commands as root without a password.",
+                    details=f"Relevant line: {line.strip()}",
+                    recommendation="Investigate the allowed commands. If they include 'ALL' or critical binaries (e.g., 'vi', 'find', 'less', 'nmap'), you can likely escalate privileges."
+                )
                 found_misconfigurations = True
             elif "ALL" in line and "(ALL:ALL)" in line:
-                print(f"  [+] Possible SUDO ALL commands misconfiguration found:")
-                print(f"      {line.strip()}")
-                print("      Consider investigating if you can run any command as any user/group.")
+                findings_collector.add_finding(
+                    check_type="SUDO Misconfiguration",
+                    severity=Severity.CRITICAL,
+                    title="SUDO ALL Commands Allowed",
+                    description="The current user can run any command as any user/group without restriction.",
+                    details=f"Relevant line: {line.strip()}",
+                    recommendation="This is a direct path to root. You can typically run `sudo su -` or `sudo /bin/bash`."
+                )
                 found_misconfigurations = True
 
         if not found_misconfigurations:
             print("  [-] No obvious SUDO misconfigurations found for the current user based on 'sudo -l'.")
 
     except subprocess.CalledProcessError as e:
-        # Note: e.stderr might be empty here because we redirected stderr to DEVNULL.
-        # This catch is mostly for when `check=True` fails due to command not found or other non-permission errors
-        # that still exit with a non-zero code but don't output to stderr.
-        if "User is not in the sudoers file" in e.output: # Sometimes this info comes on stdout
+        if "User is not in the sudoers file" in e.output:
             print("  [-] Current user is not in the sudoers file or cannot run sudo commands.")
         else:
-            # If there's an error, but it's not the "not in sudoers" one, print generic error.
-            print(f"  [!] Error running 'sudo -l'. Command returned non-zero exit code.")
-            print(f"      Stdout (if any): {e.stdout.strip()}")
-            # We explicitly send stderr to DEVNULL, so e.stderr will be empty.
-            print(f"      Consider checking if sudo is installed and accessible.")
+            findings_collector.add_finding(
+                check_type="SUDO Misconfiguration",
+                severity=Severity.LOW,
+                title="Error Checking SUDO Permissions",
+                description="Could not determine sudo permissions. 'sudo -l' returned an error.",
+                details=f"Error message: {e.stdout.strip()}",
+                recommendation="Ensure sudo is installed and you have basic permissions to run `sudo -l` (even if it's denied)."
+            )
     except FileNotFoundError:
-        print("  [!] 'sudo' command not found. Is sudo installed on this system?")
-    except Exception as e: # Catch any other unexpected errors
-        print(f"  [!] An unexpected error occurred: {e}")
+        findings_collector.add_finding(
+            check_type="SUDO Misconfiguration",
+            severity=Severity.LOW,
+            title="'sudo' Command Not Found",
+            description="The 'sudo' command was not found on the system.",
+            recommendation="Verify if 'sudo' is installed. If not, this vector is unavailable."
+        )
+    except Exception as e:
+        findings_collector.add_finding(
+            check_type="SUDO Misconfiguration",
+            severity=Severity.LOW,
+            title="Unexpected Error During SUDO Check",
+            description=f"An unexpected error occurred: {e}",
+            recommendation="Review the error for potential debugging."
+        )
     print("-" * 40)
 
 # Example of how you could test this module independently (optional)

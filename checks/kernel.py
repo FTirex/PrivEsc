@@ -1,6 +1,7 @@
 # checks/kernel_version_check.py
 
 import subprocess
+from utils.findings import findings_collector, Severity
 
 def check_kernel_version():
     """
@@ -8,25 +9,43 @@ def check_kernel_version():
     """
     print("[*] Checking kernel version for known vulnerabilities...")
     try:
-        # Run 'uname -a' to get detailed kernel information
         result = subprocess.run(['uname', '-a'], capture_output=True, text=True, check=True)
         kernel_info = result.stdout.strip()
-        
-        # Extract just the kernel version (e.g., '5.4.0-77-generic')
-        # This is a basic attempt; more robust parsing might be needed for specific formats.
         kernel_version = kernel_info.split(' ')[2]
 
-        print(f"  [+] Current Kernel Version: {kernel_version}")
-        print("      ACTION: Research this kernel version on Exploit-DB, Google, or CVE databases.")
-        print("      Look for local privilege escalation (LPE) exploits specific to this version.")
-        print(f"      Full uname output: {kernel_info}")
+        findings_collector.add_finding(
+            check_type="Kernel Version",
+            severity=Severity.INFO, # This is INFO, as it only identifies, not confirms vulnerability
+            title="Kernel Version Identified",
+            description=f"The current Linux kernel version is: {kernel_version}",
+            details=f"Full uname output: {kernel_info}",
+            recommendation="Research this kernel version (e.g., on Exploit-DB, Google, CVE databases) for known local privilege escalation (LPE) exploits. Pay attention to the exact version and distribution."
+        )
 
     except FileNotFoundError:
-        print("  [!] 'uname' command not found. Cannot determine kernel version.")
+        findings_collector.add_finding(
+            check_type="Kernel Version",
+            severity=Severity.LOW,
+            title="'uname' Command Not Found",
+            description="The 'uname' command is not found. Cannot determine kernel version.",
+            recommendation="Ensure 'coreutils' or similar basic system tools are installed."
+        )
     except subprocess.CalledProcessError as e:
-        print(f"  [!] Error running 'uname -a': {e.stderr.strip()}")
+        findings_collector.add_finding(
+            check_type="Kernel Version",
+            severity=Severity.LOW,
+            title="Error Running 'uname -a'",
+            description=f"Error executing 'uname -a': {e.stderr.strip()}",
+            recommendation="Review the error for potential debugging."
+        )
     except Exception as e:
-        print(f"  [!] An unexpected error occurred during kernel version check: {e}")
+        findings_collector.add_finding(
+            check_type="Kernel Version",
+            severity=Severity.LOW,
+            title="Unexpected Error During Kernel Version Check",
+            description=f"An unexpected error occurred: {e}",
+            recommendation="Review the error for potential debugging."
+        )
     print("-" * 40)
 
 # Optional: Test the module independently
