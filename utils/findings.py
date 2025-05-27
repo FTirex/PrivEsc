@@ -43,6 +43,16 @@ class FindingsCollector:
     _instance = None
     _findings = []
 
+    # Define ANSI color codes
+    COLORS = {
+        Severity.CRITICAL: '\033[91m',  # Bright Red
+        Severity.HIGH: '\033[93m',      # Bright Yellow
+        Severity.MEDIUM: '\033[94m',    # Bright Blue
+        Severity.LOW: '\033[96m',       # Bright Cyan
+        Severity.INFO: '\033[92m',      # Bright Green
+        'RESET': '\033[0m'              # Reset to default color
+    }
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(FindingsCollector, cls).__new__(cls)
@@ -62,12 +72,11 @@ class FindingsCollector:
 
     @classmethod
     def print_summary(cls):
-        """Prints a prioritized summary of all findings."""
+        """Prints a prioritized summary of all findings with colors."""
         if not cls._findings:
-            print("\n[+] No significant privilege escalation opportunities found during the scan. (Good!)")
+            print(f"\n{cls.COLORS[Severity.INFO]}[+]{cls.COLORS['RESET']} No significant privilege escalation opportunities found during the scan. (Good!)")
             return
 
-        # Sort findings by severity (highest first) and then by check type
         sorted_findings = sorted(cls._findings, key=lambda f: (f.severity, f.check_type), reverse=True)
 
         print("\n" + "=" * 50)
@@ -78,7 +87,8 @@ class FindingsCollector:
         for i, finding in enumerate(sorted_findings):
             if finding.severity != current_severity:
                 current_severity = finding.severity
-                print(f"\n--- {current_severity} SEVERITY FINDINGS ---")
+                color = cls.COLORS.get(current_severity, cls.COLORS['RESET'])
+                print(f"\n{color}--- {current_severity} SEVERITY FINDINGS ---{cls.COLORS['RESET']}")
 
             print(f"\nOpportunity {i + 1}:")
             print(f"  Title: {finding.title}")
