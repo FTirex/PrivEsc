@@ -86,38 +86,62 @@ def check_cron_job_misconfigurations():
     print("[*] Checking for cron job misconfigurations...")
     found_issues = False
 
+    # Check /etc/cron.d/ for writable files
     cron_d_path = "/etc/cron.d"
     if os.path.isdir(cron_d_path):
-        for filename in os.listdir(cron_d_path):
-            filepath = os.path.join(cron_d_path, filename)
-            if os.path.isfile(filepath) and is_writable_by_current_user(filepath):
-                print(f"  [+] WARNING: Writable cron file in '{cron_d_path}': '{filepath}'")
-                print("      A low-privileged user could modify this cron job, potentially leading to root execution.")
-                found_issues = True
+        try:
+            for filename in os.listdir(cron_d_path):
+                filepath = os.path.join(cron_d_path, filename)
+                if os.path.isfile(filepath) and is_writable_by_current_user(filepath):
+                    print(f"  [+] WARNING: Writable cron file in '{cron_d_path}': '{filepath}'")
+                    print("      A low-privileged user could modify this cron job, potentially leading to root execution.")
+                    found_issues = True
+        except PermissionError:
+            print(f"  [!] Permission denied when accessing '{cron_d_path}'. Cannot check for writable cron.d files.")
+        except Exception as e:
+            print(f"  [!] Error checking '{cron_d_path}': {e}")
 
+
+    # Check /var/spool/cron/crontabs for writable user crontabs (less direct for root)
     crontabs_path = "/var/spool/cron/crontabs"
     if os.path.isdir(crontabs_path):
-        for username_file in os.listdir(crontabs_path):
-            filepath = os.path.join(crontabs_path, username_file)
-            if os.path.isfile(filepath) and is_writable_by_current_user(filepath):
-                print(f"  [+] NOTE: User crontab file writable: '{filepath}'")
-                print("      This means the user could modify their own cron jobs, which is normal. But check if it belongs to an 'admin' user.")
+        try:
+            for username_file in os.listdir(crontabs_path):
+                filepath = os.path.join(crontabs_path, username_file)
+                if os.path.isfile(filepath) and is_writable_by_current_user(filepath):
+                    print(f"  [+] NOTE: User crontab file writable: '{filepath}'")
+                    print("      This means the user could modify their own cron jobs, which is normal. But check if it belongs to an 'admin' user.")
+        except PermissionError:
+            print(f"  [!] Permission denied when accessing '{crontabs_path}'. Cannot check for writable user crontabs.")
+        except Exception as e:
+            print(f"  [!] Error checking '{crontabs_path}': {e}")
 
+
+    # Check if the /etc/crontab file itself is writable
     etc_crontab = "/etc/crontab"
-    if os.path.exists(etc_crontab) and is_writable_by_current_user(etc_crontab):
-        print(f"  [+] CRITICAL: '{etc_crontab}' is writable by the current user!")
-        print("      This would allow direct modification of system-wide cron jobs, likely leading to root access.")
-        found_issues = True
+    if os.path.exists(etc_crontab): # Check existence before access check
+        if is_writable_by_current_user(etc_crontab):
+            print(f"  [+] CRITICAL: '{etc_crontab}' is writable by the current user!")
+            print("      This would allow direct modification of system-wide cron jobs, likely leading to root access.")
+            found_issues = True
+    # else: print(f"  [!] Warning: '{etc_crontab}' not found.") # This file should always exist
 
+    # Check common cron script directories for writable scripts
     common_cron_script_dirs = ['/etc/cron.hourly', '/etc/cron.daily', '/etc/cron.weekly', '/etc/cron.monthly']
     for cron_dir in common_cron_script_dirs:
         if os.path.isdir(cron_dir):
-            for script_name in os.listdir(cron_dir):
-                script_path = os.path.join(cron_dir, script_name)
-                if os.path.isfile(script_path) and is_writable_by_current_user(script_path):
-                    print(f"  [+] WARNING: Writable script in cron directory: '{script_path}'")
-                    print("      If this script is run by root's cron, a low-privileged user could modify it.")
-                    found_issues = True
+            try:
+                for script_name in os.listdir(cron_dir):
+                    script_path = os.path.join(cron_dir, script_name)
+                    if os.path.isfile(script_path) and is_writable_by_current_user(script_path):
+                        print(f"  [+] WARNING: Writable script in cron directory: '{script_path}'")
+                        print("      If this script is run by root's cron, a low-privileged user could modify it.")
+                        found_issues = True
+            except PermissionError:
+                print(f"  [!] Permission denied when accessing '{cron_dir}'. Skipping script checks in this directory.")
+            except Exception as e:
+                print(f"  [!] Error checking '{cron_dir}': {e}")
+
 
     if not found_issues:
         print("  [-] No obvious cron job misconfigurations found based on writable files.")
