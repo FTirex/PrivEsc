@@ -25,9 +25,6 @@ def main():
     check_kernel_version()
     check_home_directory_permissions()
     run_all_advanced_checks()
-    
-    # Call the new advanced checks
-    run_all_advanced_checks()
 
     print("\nScan complete. Review the findings above.")
 
